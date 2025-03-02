@@ -1,0 +1,11 @@
+__pycache__/
+*.log
+*.env
+venv/
+.DS_Store
+venv/
+__pycache__/
+*.pyc
+*.dist-info/
+lambda_function.zip
+.DS_Store
