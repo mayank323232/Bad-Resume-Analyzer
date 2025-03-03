@@ -1,44 +1,38 @@
 import streamlit as st
+import boto3
 import requests
 import json
 
-API_GATEWAY_URL = "your-api-invoke-url/ResumeAnalyzerLambda"
 
-def analyze_resume(file_key):
-    """ Sends a request to API Gateway to analyze the resume. """
-    response = requests.post(
-        API_GATEWAY_URL,
-        json={"s3_bucket": "bad-resume-bucket", "file_key": file_key}
-    )
-
-    s
-    print("Response Status:", response.status_code)
-    print("Response Text:", response.text)
-
-    if response.status_code == 200:
-        try:
-            data = response.json()
-            
-            if "feedback" in data:
-                return data["feedback"]
-            else:
-                return f"Unexpected API response format: {data}"
-        except json.JSONDecodeError:
-            return f"Error parsing JSON: {response.text}"
-    else:
-        return f"Error: {response.text}"
+S3_BUCKET = "your-bucket-name"
+S3_REGION = "your-region"
+LAMBDA_ENDPOINT = "your-lambda-api-gateway-url"
 
 
-st.title("📝 Bad Resume Analyzer")
-st.write("Upload a resume and get feedback on common mistakes.")
+s3 = boto3.client("s3")
 
-uploaded_file = st.file_uploader("Choose a PDF resume", type=["pdf"])
+st.title("Bad Resume Analyzer")
+
+uploaded_file = st.file_uploader("Upload your resume (PDF only)", type=["pdf"])
 
 if uploaded_file is not None:
     file_key = uploaded_file.name  
-    st.write(f"📂 File uploaded: {file_key}")
 
-    if st.button("Analyze Resume"):
-        with st.spinner("Analyzing... 🔍"):
-            feedback = analyze_resume(file_key)
-            st.markdown(feedback)  
+    
+    try:
+        s3.upload_fileobj(uploaded_file, S3_BUCKET, file_key)
+        st.success(f"Uploaded {file_key} to S3")
+    except Exception as e:
+        st.error(f"Failed to upload to S3: {str(e)}")
+        st.stop()
+
+    
+    payload = {"s3_bucket": S3_BUCKET, "file_key": file_key}
+    response = requests.post(LAMBDA_ENDPOINT, json=payload)
+
+    if response.status_code == 200:
+        feedback = response.json().get("feedback", "No feedback received")
+        st.write("### Feedback")
+        st.write(feedback)
+    else:
+        st.error("Error from Lambda: " + response.text)
